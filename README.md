@@ -1,6 +1,6 @@
 # 🛡️ Vielle-Cyber — Moteur de Veille Cybersécurité
 
-Un moteur de veille cybersécurité en temps réel qui collecte, normalise, enrichit et score des événements de menaces depuis plus de 30 sources hétérogènes (RSS, abuse.ch, ransomware.live).
+Un moteur de veille cybersécurité en temps réel qui collecte, normalise, enrichit et score des événements de menaces depuis plus de 40 sources hétérogènes (RSS, abuse.ch, ransomware.live, CISA KEV, EPSS, CVE.org, OSV.dev, MITRE ATT&CK, AlienVault OTX, et plus).
 
 ---
 
@@ -9,30 +9,34 @@ Un moteur de veille cybersécurité en temps réel qui collecte, normalise, enri
 ```
 src/
 ├── config/
-│   ├── feeds.ts                # 30+ feeds RSS avec tiers de crédibilité
-│   └── threat-sources.ts       # APIs threat intel (abuse.ch, ransomware.live)
+│   ├── feeds.ts                  # 38+ feeds RSS avec tiers de crédibilité
+│   └── threat-sources.ts         # APIs threat intel (abuse.ch, CISA, EPSS, OTX...)
 ├── models/
-│   └── unified-event.ts        # Modèle UnifiedThreatEvent commun
+│   └── unified-event.ts          # Modèle UnifiedThreatEvent commun
 ├── normalizers/
-│   ├── rss-normalizer.ts       # RSS/Atom XML → UnifiedThreatEvent
-│   ├── abusech-normalizer.ts   # abuse.ch JSON → UnifiedThreatEvent
-│   └── ransomware-normalizer.ts # ransomware.live → UnifiedThreatEvent
+│   ├── rss-normalizer.ts         # RSS/Atom XML → UnifiedThreatEvent
+│   ├── abusech-normalizer.ts     # abuse.ch JSON → UnifiedThreatEvent
+│   ├── ransomware-normalizer.ts  # ransomware.live → UnifiedThreatEvent
+│   ├── vuln-enrichment-normalizer.ts # CISA KEV, EPSS, CVE.org, OSV.dev
+│   ├── mitre-normalizer.ts       # MITRE ATT&CK STIX → lookup TTP en mémoire
+│   ├── greynoise-normalizer.ts   # GreyNoise Community → classification IP
+│   └── otx-normalizer.ts         # AlienVault OTX pulses → IOCs
 ├── extractors/
-│   ├── cve-extractor.ts        # Extraction CVE-YYYY-NNNNN
-│   ├── ioc-extractor.ts        # IPs publiques, domaines, hashes
-│   └── keyword-classifier.ts   # Mots-clés cybersécurité → scoring
+│   ├── cve-extractor.ts          # Extraction CVE-YYYY-NNNNN
+│   ├── ioc-extractor.ts          # IPs publiques, domaines, hashes
+│   └── keyword-classifier.ts    # Mots-clés cybersécurité + outils + tendances
 ├── enrichment/
-│   └── cross-correlator.ts     # Corrélation CVE ↔ articles, IOC ↔ news
+│   └── cross-correlator.ts       # Corrélation + enrichissement EPSS/KEV/MITRE/GreyNoise
 ├── scoring/
-│   └── threat-scorer.ts        # Scoring multi-facteurs (0-100)
+│   └── threat-scorer.ts          # Scoring multi-facteurs (0-100) avec bonus enrichissement
 ├── cache/
-│   └── redis.ts                # Redis + fallback mémoire, anti thundering herd
+│   └── redis.ts                  # Redis + fallback mémoire, anti thundering herd
 ├── fetchers/
-│   ├── rss-fetcher.ts          # HTTP RSS avec circuit breaker
-│   └── threat-fetcher.ts       # APIs threat intel
-├── poll-loop.ts                # Smart poll avec jitter, backoff, stagger
-├── data-lifecycle.ts           # TTL adaptatifs par type d'événement
-└── index.ts                    # API HTTP + point d'entrée
+│   ├── rss-fetcher.ts            # HTTP RSS avec circuit breaker
+│   └── threat-fetcher.ts         # APIs threat intel + rate limiter
+├── poll-loop.ts                  # Smart poll avec jitter, backoff, stagger
+├── data-lifecycle.ts             # TTL adaptatifs par type d'événement
+└── index.ts                      # API HTTP + point d'entrée
 ```
 
 ---
@@ -66,8 +70,10 @@ Variables disponibles :
 | `UPSTASH_REDIS_REST_TOKEN` | Token d'authentification Upstash | Non* |
 | `PORT` | Port du serveur HTTP (défaut: 3000) | Non |
 | `URGENT_SCORE_THRESHOLD` | Seuil de score pour isUrgent (défaut: 70) | Non |
-| `OTX_API_KEY` | Clé API AlienVault OTX | Non |
-| `ABUSEIPDB_API_KEY` | Clé API AbuseIPDB | Non |
+| `OTX_API_KEY` | Clé API AlienVault OTX (gratuit) | Non |
+| `ABUSEIPDB_API_KEY` | Clé API AbuseIPDB (gratuit, 1000 req/j) | Non |
+| `VIRUSTOTAL_API_KEY` | Clé API VirusTotal (gratuit, 4 req/min) | Non |
+| `GREYNOISE_API_KEY` | Clé API GreyNoise Community (gratuit, 50 req/j) | Non |
 
 *Sans Redis, les données sont stockées en mémoire et perdues au redémarrage.
 
@@ -123,13 +129,27 @@ npm run build && npm start
 
 ### Sources API — Threat Intelligence
 
-| Source | Type | Intervalle |
-|--------|------|-----------|
-| Feodo Tracker (abuse.ch) | IOC — C2 IPs | 1h |
-| URLhaus (abuse.ch) | IOC — URLs malveillantes | 30 min |
-| ThreatFox (abuse.ch) | IOC — Multi-types | 1h |
-| MalwareBazaar (abuse.ch) | IOC — Hashes malware | 1h |
-| Ransomware.live | Victimes ransomware | 30 min |
+| Source | Type | Intervalle | Clé API |
+|--------|------|-----------|---------|
+| Feodo Tracker (abuse.ch) | IOC — C2 IPs | 1h | ❌ |
+| URLhaus (abuse.ch) | IOC — URLs malveillantes | 30 min | ❌ |
+| ThreatFox (abuse.ch) | IOC — Multi-types | 1h | ❌ |
+| MalwareBazaar (abuse.ch) | IOC — Hashes malware | 1h | ❌ |
+| Ransomware.live | Victimes ransomware | 30 min | ❌ |
+| AlienVault OTX | IOC — Pulses communautaires | 30 min | ✅ optionnel |
+| AbuseIPDB | IOC — Blacklist IPs | 24h | ✅ optionnel |
+| VirusTotal | Threat Actors | 24h | ✅ optionnel |
+
+### Sources d'enrichissement (Phase 2)
+
+| Source | Données | Intervalle | Clé API |
+|--------|---------|-----------|---------|
+| CISA KEV (JSON) | CVEs activement exploitées | 1h | ❌ |
+| EPSS (FIRST.org) | Score de prédiction d'exploitation | 24h | ❌ |
+| CVE.org API | CVEs récentes avec CVSS | 1h | ❌ |
+| OSV.dev | Vulns open-source (npm, PyPI, Go...) | 1h | ❌ |
+| MITRE ATT&CK | Techniques, tactiques, malwares | 1/sem | ❌ |
+| GreyNoise Community | Classification IP (noise/malicious) | enrichissement | ❌ |
 
 ---
 
@@ -156,16 +176,34 @@ Score = Base(tier) + Type + Contenu(keywords) + Entités - Bruit
 |-----------|-------|
 | zero-day / actively exploited | +30 |
 | Ransomware (avec nom de groupe) | +25 |
+| supply chain | +25 |
 | RANSOMWARE (type) | +15 |
 | critical / CVSSv3 9+ | +20 |
 | proof of concept / PoC | +20 |
 | data breach | +20 |
-| supply chain | +25 |
 | apt / nation-state | +20 |
+| cyber-event (arrestation, takedown) | +20 |
+| new-tool (outil cyber publié) | +15 |
+| threat-trend (campagne, vague d'attaques) | +15 |
 | patch released | +15 |
+| phishing | +15 |
+| regulation (NIS2, DORA, RGPD) | +10 |
+| defense-technique (YARA, Sigma, hunting) | +10 |
 | CVE présente | +10 |
 | IOCs (IPs, hashes) | +10 |
 | Plusieurs malwares identifiés | +5 par malware (max 3) |
+
+### Bonus d'enrichissement (Phase 2)
+
+| Condition | Bonus |
+|-----------|-------|
+| EPSS ≥ 0.8 (forte probabilité d'exploit) | +25 |
+| EPSS ≥ 0.5 | +15 |
+| EPSS ≥ 0.2 | +8 |
+| CISA KEV (exploité activement) | +20 |
+| Exploit public disponible | +15 |
+| GreyNoise: IP malveillante confirmée | +10 |
+| GreyNoise: IP bénigne (démotion) | -20 |
 
 ### Démotions (filtre anti-bruit)
 
@@ -197,7 +235,7 @@ Retourne les événements récents triés par score décroissant.
 
 | Paramètre | Valeurs | Description |
 |-----------|---------|-------------|
-| `type` | `NEWS`, `VULNERABILITY`, `IOC`, `ADVISORY`, `RANSOMWARE` | Filtrer par type |
+| `type` | `NEWS`, `VULNERABILITY`, `IOC`, `ADVISORY`, `RANSOMWARE`, `TOOL` | Filtrer par type |
 | `severity` | `critical`, `high`, `medium`, `low`, `info` | Filtrer par sévérité |
 | `source` | Texte libre | Filtrer par nom de source |
 | `limit` | Nombre (max 200, défaut 50) | Nombre de résultats |
@@ -279,6 +317,7 @@ curl http://localhost:3000/api/health
 | IOC | 48 heures | Les IPs compromises peuvent être assainies |
 | VULNERABILITY | 90 jours | Les CVEs restent pertinentes longtemps |
 | RANSOMWARE | 30 jours | Suivi des campagnes actives |
+| TOOL | 14 jours | Les releases d'outils restent intéressantes 2 semaines |
 
 > **Touch on re-see** : Si un IOC réapparaît dans un feed, son TTL Redis est remis à zéro.
 
@@ -299,7 +338,7 @@ curl http://localhost:3000/api/health
 ```typescript
 interface UnifiedThreatEvent {
   id: string;                    // Hash MD5 unique (déduplication)
-  type: 'NEWS' | 'VULNERABILITY' | 'IOC' | 'ADVISORY' | 'RANSOMWARE';
+  type: 'NEWS' | 'VULNERABILITY' | 'IOC' | 'ADVISORY' | 'RANSOMWARE' | 'TOOL';
   source: string;                // Nom de la source
   tier: 1 | 2 | 3 | 4;          // Niveau de crédibilité
   category: string;
@@ -313,12 +352,19 @@ interface UnifiedThreatEvent {
     domains: string[];
     hashes: string[];            // SHA256, MD5, SHA1
     malwareNames: string[];      // ["Emotet", "LockBit"]
-    attackTypes: string[];       // ["ransomware", "zero-day"]
+    attackTypes: string[];       // ["ransomware", "T1486"]
   };
   score: number;                 // 0-100
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   isUrgent: boolean;
   correlatedWith?: string[];     // IDs d'événements liés
+  enrichments?: {                // Données Phase 2
+    epssScore?: number;          // Probabilité d'exploitation à 30 jours
+    knownExploited?: boolean;    // CISA KEV
+    cvssScore?: number;          // Score CVSS 3.1
+    mitreTTPs?: string[];        // ["T1059 — Command and Scripting Interpreter"]
+    greynoiseClassification?: string; // "benign" | "malicious" | "unknown"
+  };
   ttlCategory: string;
   expiresAt: number;
 }
@@ -328,11 +374,14 @@ interface UnifiedThreatEvent {
 
 ## Roadmap
 
-- [ ] **Phase 2** : Interface web React (tableau de bord temps réel)
-- [ ] **Phase 3** : Alertes Slack/Teams/PagerDuty pour les événements urgents
-- [ ] **Phase 4** : Enrichissement EPSS + CVSS depuis l'API NVD
-- [ ] **Phase 5** : Score ML basé sur l'historique des menaces
-- [ ] **Phase 6** : Export STIX 2.1 pour interopérabilité MISP
+- [x] **Phase 1** : Moteur de collecte + normalisation + scoring + API HTTP
+- [x] **Phase 2** : Sources threat intel (CISA KEV, EPSS, CVE.org, OSV, MITRE ATT&CK, OTX, GreyNoise, AbuseIPDB, VirusTotal) + enrichissement croisé + outils cyber + tendances
+- [ ] **Phase 3** : Clustering & déduplication sémantique (Jaccard, trending topics)
+- [ ] **Phase 4** : Interface web React (tableau de bord temps réel)
+- [ ] **Phase 5** : Alertes Slack/Teams/Discord/Email pour les événements urgents
+- [ ] **Phase 6** : Score ML basé sur l'historique des menaces
+- [ ] **Phase 7** : Persistance SQL (PostgreSQL) + historique + recherche full-text
+- [ ] **Phase 8** : Export STIX 2.1 pour interopérabilité MISP
 
 ---
 

@@ -22,6 +22,7 @@ export const TTL_SECONDS: Record<TtlCategory, number> = {
   ioc: 48 * 3600,               // 48 heures = 172800s
   vulnerability: 90 * 24 * 3600, // 90 jours = 7776000s
   ransomware: 30 * 24 * 3600,   // 30 jours = 2592000s
+  tool: 14 * 24 * 3600,         // 14 jours = 1209600s
 };
 
 /**
@@ -34,6 +35,7 @@ export function getTtlCategory(type: ThreatEventType): TtlCategory {
     IOC: 'ioc',
     VULNERABILITY: 'vulnerability',
     RANSOMWARE: 'ransomware',
+    TOOL: 'tool',
   };
   return mapping[type];
 }

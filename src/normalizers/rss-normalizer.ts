@@ -67,6 +67,7 @@ function categoryToType(category: FeedConfig['category']): ThreatEventType {
     vulnerability: 'VULNERABILITY',
     'threat-intel': 'IOC',
     ransomware: 'RANSOMWARE',
+    'tool-release': 'TOOL',
   };
   return mapping[category];
 }

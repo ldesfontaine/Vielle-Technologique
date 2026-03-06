@@ -14,6 +14,9 @@
 import { UnifiedThreatEvent } from '../models/unified-event.js';
 import { getCachedJson, setCachedJson } from '../cache/redis.js';
 import { applyCorrelationBoost, refreshSeverity } from '../scoring/threat-scorer.js';
+import { getEpssScore, isKnownExploited } from '../normalizers/vuln-enrichment-normalizer.js';
+import { lookupTTPs, isMitreLoaded } from '../normalizers/mitre-normalizer.js';
+import { getGreyNoiseClassification } from '../normalizers/greynoise-normalizer.js';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -165,7 +168,8 @@ export async function correlateEvent(event: UnifiedThreatEvent): Promise<void> {
 /**
  * Pipeline complet pour un nouvel événement :
  * 1. Corréler avec les événements existants
- * 2. Indexer ses propres entités pour les corrélations futures
+ * 2. Enrichir avec EPSS, CISA KEV, MITRE ATT&CK, GreyNoise
+ * 3. Indexer ses propres entités pour les corrélations futures
  *
  * @param event - L'événement à traiter (modifié en place)
  */
@@ -173,6 +177,134 @@ export async function processNewEvent(event: UnifiedThreatEvent): Promise<void> 
   // D'abord corréler avec l'existant
   await correlateEvent(event);
 
+  // Enrichissement Phase 2 (modifier en place)
+  await enrichWithEpss(event);
+  await enrichWithKev(event);
+  enrichWithMitre(event);
+  await enrichWithGreyNoise(event);
+
   // Ensuite indexer pour les futurs événements
   await indexEventEntities(event);
 }
+
+// ─── Phase 2 : Enrichissements ────────────────────────────────────────────────
+
+/**
+ * Enrichit un événement avec les scores EPSS pour chaque CVE détectée.
+ * Ajoute le score le plus élevé dans event.enrichments.epssScore
+ * et booste le score si EPSS est significatif.
+ */
+async function enrichWithEpss(event: UnifiedThreatEvent): Promise<void> {
+  const cves = event.extractedEntities.cves;
+  if (cves.length === 0) return;
+
+  let maxEpss = 0;
+  let maxPercentile = 0;
+  const epssDetails: Record<string, number> = {};
+
+  for (const cve of cves) {
+    const epssData = await getEpssScore(cve);
+    if (epssData) {
+      epssDetails[cve] = epssData.epss;
+      if (epssData.epss > maxEpss) {
+        maxEpss = epssData.epss;
+        maxPercentile = epssData.percentile;
+      }
+    }
+  }
+
+  if (maxEpss > 0) {
+    if (!event.enrichments) event.enrichments = {};
+    event.enrichments['epssScore'] = maxEpss;
+    event.enrichments['epssPercentile'] = maxPercentile;
+    if (Object.keys(epssDetails).length > 1) {
+      event.enrichments['epssDetails'] = epssDetails;
+    }
+
+    // Boost scoring
+    if (maxEpss >= 0.8) {
+      event.score = Math.min(100, event.score + 25);
+    } else if (maxEpss >= 0.5) {
+      event.score = Math.min(100, event.score + 15);
+    } else if (maxEpss >= 0.2) {
+      event.score = Math.min(100, event.score + 8);
+    }
+
+    refreshSeverity(event);
+  }
+}
+
+/**
+ * Enrichit un événement avec le statut CISA KEV (Known Exploited Vulnerability).
+ */
+async function enrichWithKev(event: UnifiedThreatEvent): Promise<void> {
+  const cves = event.extractedEntities.cves;
+  if (cves.length === 0) return;
+
+  for (const cve of cves) {
+    const exploited = await isKnownExploited(cve);
+    if (exploited) {
+      if (!event.enrichments) event.enrichments = {};
+      event.enrichments['knownExploited'] = true;
+      event.enrichments['kevCve'] = cve;
+
+      // Boost significatif pour les KEV
+      event.score = Math.min(100, event.score + 20);
+      refreshSeverity(event);
+      break; // Un seul suffit
+    }
+  }
+}
+
+/**
+ * Enrichit un événement avec les TTPs MITRE ATT&CK.
+ * Mappe les malwareNames et toolNames vers des techniques connues.
+ */
+function enrichWithMitre(event: UnifiedThreatEvent): void {
+  if (!isMitreLoaded()) return;
+
+  const { malwareNames, attackTypes } = event.extractedEntities;
+  if (malwareNames.length === 0 && attackTypes.length === 0) return;
+
+  const ttps = lookupTTPs(malwareNames, []);
+  if (ttps.length > 0) {
+    if (!event.enrichments) event.enrichments = {};
+    event.enrichments['mitreTTPs'] = ttps;
+
+    // Ajouter les TTP IDs aux attackTypes
+    const ttpIds = ttps.map(t => t.split(' — ')[0]).filter((t): t is string => !!t);
+    event.extractedEntities.attackTypes = [
+      ...new Set([...event.extractedEntities.attackTypes, ...ttpIds]),
+    ];
+  }
+}
+
+/**
+ * Enrichit les IOCs avec la classification GreyNoise.
+ * Démotion pour les IPs bénignes, boost pour les malveillantes.
+ */
+async function enrichWithGreyNoise(event: UnifiedThreatEvent): Promise<void> {
+  const ips = event.extractedEntities.ips;
+  if (ips.length === 0) return;
+
+  // Vérifier seulement la première IP (pour limiter les appels cache)
+  const ip = ips[0];
+  if (!ip) return;
+
+  const gnData = await getGreyNoiseClassification(ip);
+  if (!gnData) return;
+
+  if (!event.enrichments) event.enrichments = {};
+  event.enrichments['greynoiseClassification'] = gnData.classification;
+  event.enrichments['greynoiseName'] = gnData.name;
+  event.enrichments['greynoiseRiot'] = gnData.riot;
+
+  if (gnData.classification === 'benign') {
+    event.score = Math.max(0, event.score - 20);
+    refreshSeverity(event);
+  } else if (gnData.classification === 'malicious') {
+    event.score = Math.min(100, event.score + 10);
+    refreshSeverity(event);
+  }
+}
+

@@ -36,6 +36,7 @@ const TYPE_MODIFIERS: Record<ThreatEventType, number> = {
   IOC: 5,
   RANSOMWARE: 15,
   NEWS: 0,
+  TOOL: 5,
 };
 
 // ─── Logique de scoring ───────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ const TYPE_MODIFIERS: Record<ThreatEventType, number> = {
  * @param type - Type d'événement
  * @param entities - Entités extraites
  * @param keywordScore - Score bonus des mots-clés
+ * @param enrichments - Données d'enrichissement optionnelles (EPSS, KEV, GreyNoise)
  * @param config - Configuration optionnelle du scoring
  * @returns Score final entre 0 et 100
  */
@@ -54,6 +56,7 @@ export function calculateScore(
   type: ThreatEventType,
   entities: ExtractedEntities,
   keywordScore: number,
+  enrichments?: Record<string, unknown>,
   config: ScoringConfig = DEFAULT_CONFIG
 ): {
   score: number;
@@ -85,10 +88,36 @@ export function calculateScore(
     score += 5 * Math.min(entities.malwareNames.length, 3); // Malwares identifiés
   }
 
-  // 5. Limiter le score entre 0 et 100
+  // 5. Bonus d'enrichissement (Phase 2)
+  if (enrichments) {
+    // EPSS : probabilité d'exploitation à 30 jours
+    const epssScore = enrichments['epssScore'];
+    if (typeof epssScore === 'number') {
+      if (epssScore >= 0.8) score += 25;
+      else if (epssScore >= 0.5) score += 15;
+      else if (epssScore >= 0.2) score += 8;
+    }
+
+    // CISA KEV : vulnérabilité activement exploitée
+    if (enrichments['knownExploited'] === true) {
+      score += 20;
+    }
+
+    // GreyNoise : démotion si IP bénigne, boost si malveillante
+    const gnClassification = enrichments['greynoiseClassification'];
+    if (gnClassification === 'benign') score -= 20;
+    else if (gnClassification === 'malicious') score += 10;
+
+    // Exploit public disponible (Exploit-DB, PoC)
+    if (enrichments['hasPublicExploit'] === true) {
+      score += 15;
+    }
+  }
+
+  // 6. Limiter le score entre 0 et 100
   score = Math.max(0, Math.min(100, score));
 
-  // 6. Déterminer la sévérité et l'urgence
+  // 7. Déterminer la sévérité et l'urgence
   const severity = scoreToSeverity(score);
   const isUrgent = score >= config.urgentThreshold;
 

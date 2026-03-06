@@ -5,13 +5,13 @@
  */
 
 /** Types d'événements supportés */
-export type ThreatEventType = 'NEWS' | 'VULNERABILITY' | 'IOC' | 'ADVISORY' | 'RANSOMWARE';
+export type ThreatEventType = 'NEWS' | 'VULNERABILITY' | 'IOC' | 'ADVISORY' | 'RANSOMWARE' | 'TOOL';
 
 /** Niveaux de sévérité */
 export type SeverityLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
 /** Catégories de TTL pour le cycle de vie des données */
-export type TtlCategory = 'news' | 'advisory' | 'ioc' | 'vulnerability' | 'ransomware';
+export type TtlCategory = 'news' | 'advisory' | 'ioc' | 'vulnerability' | 'ransomware' | 'tool';
 
 /** Entités extraites par les extracteurs (le cerveau du système) */
 export interface ExtractedEntities {

@@ -19,6 +19,8 @@ export interface ClassificationResult {
   attackTypes: string[];
   /** Noms de malwares identifiés */
   malwareNames: string[];
+  /** Noms d'outils cyber identifiés */
+  toolNames: string[];
   /** Score bonus total des mots-clés */
   totalKeywordScore: number;
   /** Détail des correspondances par catégorie */
@@ -145,6 +147,74 @@ const KEYWORD_CATEGORIES: KeywordCategory[] = [
       'public exploit', 'working exploit',
     ],
   },
+
+  // ─── Phase 2 : Catégories élargies (tools, événements, tendances) ──────────
+
+  {
+    name: 'new-tool',
+    weight: 15,
+    keywords: [
+      'new tool', 'new release', 'tool release', 'open source tool',
+      'released version', 'outil publié', 'nouvel outil', 'nouvelle version',
+      'framework released', 'scanner released', 'tool launch',
+      'open-source release', 'github release', 'v1.0', 'v2.0',
+      'pentest tool', 'red team tool', 'blue team tool',
+      'security tool', 'outil de sécurité', 'defensive tool',
+      'offensive tool', 'bug bounty tool', 'recon tool',
+    ],
+  },
+  {
+    name: 'cyber-event',
+    weight: 20,
+    keywords: [
+      'arrested', 'seized', 'takedown', 'taken down', 'dismantled',
+      'interpol', 'europol', 'fbi', 'doj', 'department of justice',
+      'arrestation', 'démantèlement', 'saisie', 'sanctions',
+      'indicted', 'charged', 'law enforcement', 'police operation',
+      'infrastructure seized', 'botnet takedown', 'dark web bust',
+      'extradited', 'sentenced', 'guilty plea', 'cyber operation',
+      'shutdown', 'disrupted', 'joint operation', 'opération conjointe',
+    ],
+  },
+  {
+    name: 'regulation',
+    weight: 10,
+    keywords: [
+      'nis2', 'dora', 'rgpd', 'gdpr', 'cyber resilience act', 'cra',
+      'sec ruling', 'sec rule', 'réglementation', 'regulation',
+      'directive européenne', 'european directive', 'compliance',
+      'conformité', 'mandatory reporting', 'incident reporting',
+      'cyber act', 'digital services act', 'dsa', 'dma',
+      'executive order', 'décret', 'nist framework',
+      'iso 27001', 'soc 2', 'pci dss', 'hipaa',
+    ],
+  },
+  {
+    name: 'threat-trend',
+    weight: 15,
+    keywords: [
+      'campaign', 'campagne', 'wave of attacks', 'vague d\'attaques',
+      'surge', 'spike', 'targeting', 'mass exploitation',
+      'widespread', 'large-scale', 'grande échelle',
+      'trend', 'tendance', 'emerging threat', 'menace émergente',
+      'threat landscape', 'paysage des menaces', 'growing threat',
+      'on the rise', 'en hausse', 'new variant', 'nouvelle variante',
+      'evolving', 'escalation', 'threat actor', 'acteur malveillant',
+    ],
+  },
+  {
+    name: 'defense-technique',
+    weight: 10,
+    keywords: [
+      'detection rule', 'yara rule', 'sigma rule', 'snort rule',
+      'suricata rule', 'detection signature', 'ioc list',
+      'mitigation', 'workaround', 'contournement', 'remediation',
+      'hardening', 'durcissement', 'best practice', 'bonne pratique',
+      'incident response', 'réponse à incident', 'forensics',
+      'threat hunting', 'chasse aux menaces', 'blue team',
+      'soc', 'siem', 'edr', 'xdr', 'ndr',
+    ],
+  },
 ];
 
 // ─── Noms de malwares connus ──────────────────────────────────────────────────
@@ -164,7 +234,36 @@ const KNOWN_MALWARE_NAMES: string[] = [
   // Backdoors
   'solarwinds', 'sunburst', 'notpetya', 'wannacry', 'petya',
   // Botnets
-  'mirai', 'qakbot', 'necurs',
+  'mirai', 'necurs',
+  // Loaders / Infostealers (Phase 2)
+  'asyncrat', 'remcos', 'njrat', 'darkgate', 'stealc', 'risepro',
+  'amadey', 'smokeloader', 'systembc', 'xworm', 'dcrat',
+];
+
+// ─── Outils cyber connus (offensifs et défensifs) ─────────────────────────────
+
+const KNOWN_CYBER_TOOLS: string[] = [
+  // Offensifs / Red Team
+  'cobalt strike', 'metasploit', 'burp suite', 'burpsuite',
+  'nmap', 'nuclei', 'sqlmap', 'hashcat', 'john the ripper',
+  'bloodhound', 'mimikatz', 'responder', 'impacket',
+  'sliver', 'mythic', 'havoc', 'brute ratel', 'bruteratel',
+  'covenant', 'empire', 'powershell empire',
+  'crackmapexec', 'netexec', 'certipy', 'rubeus', 'seatbelt',
+  'sharp collection', 'lazagne', 'chisel', 'ligolo',
+  // Défensifs / Blue Team
+  'caldera', 'atomic red team', 'ghidra', 'ida pro',
+  'volatility', 'autopsy', 'velociraptor', 'osquery',
+  'yara', 'sigma', 'suricata', 'snort', 'zeek', 'wazuh',
+  'elastic security', 'splunk', 'crowdstrike falcon',
+  'sentinel one', 'sentinelone', 'defender for endpoint',
+  // Recon / OSINT
+  'shodan', 'censys', 'amass', 'subfinder', 'httpx',
+  'theHarvester', 'maltego', 'spiderfoot', 'recon-ng',
+  // Vuln scanning
+  'openvas', 'nessus', 'qualys', 'trivy', 'grype', 'semgrep',
+  // Forensics
+  'wireshark', 'tcpdump', 'ftkimager', 'plaso', 'timesketch',
 ];
 
 // ─── Démotions (bruit) ────────────────────────────────────────────────────────
@@ -229,9 +328,15 @@ export function classifyKeywords(text: string): ClassificationResult {
     lowerText.includes(name.toLowerCase())
   );
 
+  // Extraire les noms d'outils cyber
+  const toolNames = KNOWN_CYBER_TOOLS.filter((name) =>
+    lowerText.includes(name.toLowerCase())
+  );
+
   return {
     attackTypes: [...new Set(attackTypes)],
     malwareNames: [...new Set(malwareNames)],
+    toolNames: [...new Set(toolNames)],
     totalKeywordScore,
     matches,
   };

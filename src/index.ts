@@ -228,7 +228,7 @@ function createRouter(): http.RequestListener {
       error: 'Route non trouvée',
       availableRoutes: [
         'GET /api/feed',
-        'GET /api/feed?type=NEWS|VULNERABILITY|IOC|ADVISORY|RANSOMWARE',
+        'GET /api/feed?type=NEWS|VULNERABILITY|IOC|ADVISORY|RANSOMWARE|TOOL',
         'GET /api/feed?severity=critical|high|medium|low|info',
         'GET /api/threats',
         'GET /api/cve/:id',

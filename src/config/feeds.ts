@@ -17,7 +17,7 @@ export interface FeedConfig {
   /** Tier de crédibilité (1-4) */
   tier: 1 | 2 | 3 | 4;
   /** Catégorie métier */
-  category: 'advisory' | 'news' | 'vulnerability' | 'threat-intel' | 'ransomware';
+  category: 'advisory' | 'news' | 'vulnerability' | 'threat-intel' | 'ransomware' | 'tool-release';
   /** Intervalle de polling en secondes */
   intervalSeconds: number;
   /** Langue principale du feed */
@@ -309,6 +309,80 @@ export const RSS_FEEDS: FeedConfig[] = [
     tier: 3,
     category: 'vulnerability',
     intervalSeconds: 1800,
+    lang: 'en',
+  },
+
+  // ─── Phase 2 : Feeds orientés outils, tendances et recherche ────────────────
+  {
+    id: 'portswigger-research',
+    name: 'PortSwigger Research',
+    url: 'https://portswigger.net/research/rss',
+    tier: 2,
+    category: 'tool-release',
+    intervalSeconds: 3600,
+    lang: 'en',
+  },
+  {
+    id: 'owasp-blog',
+    name: 'OWASP Blog',
+    url: 'https://owasp.org/feed.xml',
+    tier: 2,
+    category: 'news',
+    intervalSeconds: 7200,
+    lang: 'en',
+  },
+  {
+    id: 'trail-of-bits',
+    name: 'Trail of Bits Blog',
+    url: 'https://blog.trailofbits.com/feed/',
+    tier: 3,
+    category: 'tool-release',
+    intervalSeconds: 7200,
+    lang: 'en',
+  },
+  {
+    id: 'risky-biz-news',
+    name: 'Risky Business News',
+    url: 'https://risky.biz/feeds/risky-business/',
+    tier: 2,
+    category: 'news',
+    intervalSeconds: 3600,
+    lang: 'en',
+  },
+  {
+    id: 'dfir-report',
+    name: 'The DFIR Report',
+    url: 'https://thedfirreport.com/feed/',
+    tier: 2,
+    category: 'threat-intel',
+    intervalSeconds: 7200,
+    lang: 'en',
+  },
+  {
+    id: 'kitploit',
+    name: 'KitPloit — PenTest & Hacking Tools',
+    url: 'https://feeds.feedburner.com/PentestTools',
+    tier: 4,
+    category: 'tool-release',
+    intervalSeconds: 3600,
+    lang: 'en',
+  },
+  {
+    id: 'github-security-lab',
+    name: 'GitHub Security Lab',
+    url: 'https://securitylab.github.com/research/feed',
+    tier: 2,
+    category: 'vulnerability',
+    intervalSeconds: 7200,
+    lang: 'en',
+  },
+  {
+    id: 'darknet-tools',
+    name: 'Darknet — Ethical Hacking Tools',
+    url: 'https://www.darknet.org.uk/feed/',
+    tier: 3,
+    category: 'tool-release',
+    intervalSeconds: 7200,
     lang: 'en',
   },
 ];
