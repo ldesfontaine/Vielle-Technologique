@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>veille-secu dashboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f4ef;
+        --panel: #ffffff;
+        --text: #1f2933;
+        --accent: #0f4c81;
+        --muted: #6b7280;
+      }
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top left, #e3eef8, transparent 55%),
+          radial-gradient(circle at 20% 80%, #f6e8d9, transparent 50%),
+          var(--bg);
+        color: var(--text);
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 48px 24px 64px;
+      }
+      header {
+        margin-bottom: 32px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 2.2rem;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        margin-top: 24px;
+      }
+      .card {
+        background: var(--panel);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      }
+      .card h2 {
+        margin: 0 0 12px;
+        font-size: 1.1rem;
+      }
+      .note {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      button {
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 18px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(15, 76, 129, 0.25);
+      }
+      label {
+        font-size: 0.9rem;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 6px;
+      }
+      input {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #d7dce2;
+        margin-bottom: 12px;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #0b1b2a;
+        color: #e2e8f0;
+        padding: 16px;
+        border-radius: 12px;
+        min-height: 180px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .badge-db {
+        background: #e0f2fe;
+        color: #075985;
+      }
+      .badge-crawl {
+        background: #ede9fe;
+        color: #5b21b6;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>veille-secu dashboard</h1>
+        <p>Console de verification rapide de la collecte et du matching.</p>
+      </header>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Actions rapides</h2>
+          <button id="load-health">Health</button>
+          <button id="load-stats" style="margin-left: 8px;">Stats</button>
+          <button id="load-tools" style="margin-left: 8px;">Tools</button>
+          <button id="collect-now" style="margin-left: 8px;">Collect now (crawl)</button>
+          <p class="note">Le collecteur tourne deja en auto. Ce bouton force une collecte avec cooldown.</p>
+        </div>
+        <div class="card">
+          <h2>Filtrer les alertes</h2>
+          <label for="severity">Severity</label>
+          <input id="severity" placeholder="critical | high | medium | low | info" />
+          <label for="tool">Tool</label>
+          <input id="tool" placeholder="traefik" />
+          <label for="status">Status</label>
+          <input id="status" placeholder="new | read | dismissed" />
+          <label for="limit">Limit</label>
+          <input id="limit" placeholder="10" value="10" />
+          <button id="load-alerts">Charger alertes (DB)</button>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top: 24px;">
+        <h2>Reponse API</h2>
+        <pre id="output">Clique un bouton pour lancer un test.</pre>
+      </section>
+
+      <section class="card" style="margin-top: 24px;">
+        <h2>Dernieres alertes</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Severity</th>
+              <th>Title</th>
+              <th>Stack</th>
+              <th>Collected</th>
+            </tr>
+          </thead>
+          <tbody id="alerts-body">
+            <tr><td colspan="5">Charge les alertes pour voir la liste.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card" style="margin-top: 24px;">
+        <h2>Derniere collecte manuelle</h2>
+        <p class="note" id="collect-summary">Aucune collecte manuelle lancee.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Severity</th>
+              <th>Title</th>
+              <th>Stack</th>
+              <th>Collected</th>
+            </tr>
+          </thead>
+          <tbody id="collect-body">
+            <tr><td colspan="5">Clique "Collect now" pour voir les nouveaux elements.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script>
+      const output = document.getElementById("output");
+
+      function setOutput(data) {
+        output.textContent = JSON.stringify(data, null, 2);
+      }
+
+      async function fetchJson(path) {
+        const response = await fetch(path);
+        return response.json();
+      }
+
+      function renderAlerts(items) {
+        const body = document.getElementById("alerts-body");
+        if (!items || items.length === 0) {
+          body.innerHTML = "<tr><td colspan=\"5\">Aucune alerte.</td></tr>";
+          return;
+        }
+        body.innerHTML = items
+          .map(
+            (item) =>
+              `<tr><td><span class=\"badge badge-db\">DB</span> ${item.source_name}</td><td>${item.severity}</td><td>${item.title}</td><td>${(item.matched_tools || []).join(", ")}</td><td>${item.created_at || ""}</td></tr>`
+          )
+          .join("");
+      }
+
+      function renderCollect(items, inserted) {
+        const body = document.getElementById("collect-body");
+        const summary = document.getElementById("collect-summary");
+        summary.textContent = `Nouveaux elements: ${inserted}`;
+        if (!items || items.length === 0) {
+          body.innerHTML = "<tr><td colspan=\"5\">Aucun nouvel element.</td></tr>";
+          return;
+        }
+        body.innerHTML = items
+          .map(
+            (item) =>
+              `<tr><td><span class=\"badge badge-crawl\">CRAWL</span> ${item.source_name}</td><td>${item.severity}</td><td>${item.title}</td><td>${(item.matched_tools || []).join(", ")}</td><td>${item.created_at || ""}</td></tr>`
+          )
+          .join("");
+      }
+
+      document.getElementById("load-health").addEventListener("click", async () => {
+        setOutput(await fetchJson("/health"));
+      });
+
+      document.getElementById("load-stats").addEventListener("click", async () => {
+        setOutput(await fetchJson("/api/stats"));
+      });
+
+      document.getElementById("load-tools").addEventListener("click", async () => {
+        setOutput(await fetchJson("/api/tools"));
+      });
+
+      document.getElementById("collect-now").addEventListener("click", async () => {
+        const response = await fetch("/api/collect", { method: "POST" });
+        const data = await response.json();
+        setOutput(data);
+        renderCollect(data.new_alerts || [], data.inserted || 0);
+      });
+
+      document.getElementById("load-alerts").addEventListener("click", async () => {
+        const params = new URLSearchParams();
+        const severity = document.getElementById("severity").value.trim();
+        const tool = document.getElementById("tool").value.trim();
+        const status = document.getElementById("status").value.trim();
+        const limit = document.getElementById("limit").value.trim();
+
+        if (severity) params.set("severity", severity);
+        if (tool) params.set("tool", tool);
+        if (status) params.set("status", status);
+        if (limit) params.set("limit", limit);
+
+        const query = params.toString();
+        const url = query ? `/api/alerts?${query}` : "/api/alerts";
+        const data = await fetchJson(url);
+        setOutput(data);
+        renderAlerts(data.alerts || []);
+      });
+    </script>
+  </body>
+</html>

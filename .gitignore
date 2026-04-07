@@ -1,4 +1,32 @@
-node_modules/
-dist/
+# Env
 .env
-*.js.map
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Data (volume Docker)
+data/
+
+# Claude (local only)
+.claude/
+
+# Docs (local only)
+docs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+services:
+  veille-secu:
+    build: .
+    container_name: veille-secu
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${WEB_PORT:-8094}:8094"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8094/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
