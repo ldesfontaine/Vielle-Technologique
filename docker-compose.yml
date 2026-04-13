@@ -1,6 +1,6 @@
 services:
   veille-secu:
-    build: .
+    image: ghcr.io/ldesfontaine/vielle-technologique:${VEILLE_VERSION:-latest}
     container_name: veille-secu
     restart: unless-stopped
     env_file:
