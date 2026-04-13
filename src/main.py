@@ -22,6 +22,7 @@ CRON_INTERVAL = int(os.environ.get("CRON_INTERVAL", "3600"))
 WEB_PORT = int(os.environ.get("WEB_PORT", "8094"))
 NTFY_URL = os.environ.get("NTFY_URL", "").strip()
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
+NTFY_TOKEN = os.environ.get("NTFY_TOKEN", "").strip()
 DASHBOARD_ENABLED = os.environ.get("DASHBOARD_ENABLED", "false").strip().lower() in {
     "1",
     "true",
@@ -148,7 +149,7 @@ async def collect_cycle(manual: bool = False) -> Dict[str, object]:
 
             should_notify = normalized.get("severity") == "critical"
             if should_notify:
-                sent = await send_ntfy_alert(NTFY_URL, NTFY_TOPIC, normalized)
+                sent = await send_ntfy_alert(NTFY_URL, NTFY_TOPIC, normalized, token=NTFY_TOKEN)
                 normalized["notified"] = sent
 
             insert_alert(DB_PATH, normalized)
@@ -190,7 +191,7 @@ async def maybe_send_high_digest() -> None:
 
     alerts = list_alerts_since(DB_PATH, "high", since_iso)
     if alerts:
-        await send_ntfy_digest(NTFY_URL, NTFY_TOPIC, alerts)
+        await send_ntfy_digest(NTFY_URL, NTFY_TOPIC, alerts, token=NTFY_TOKEN)
 
     set_meta(DB_PATH, "last_digest_date", today)
 

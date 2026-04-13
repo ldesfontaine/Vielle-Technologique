@@ -25,15 +25,18 @@ def build_ntfy_message(alert: Dict[str, object]) -> str:
     return "\n".join(parts)
 
 
-async def send_ntfy_alert(ntfy_url: str, topic: str, alert: Dict[str, object]) -> bool:
+async def send_ntfy_alert(ntfy_url: str, topic: str, alert: Dict[str, object], *, token: str = "") -> bool:
     if not ntfy_url or not topic:
         return False
 
     message = build_ntfy_message(alert)
     url = f"{ntfy_url.rstrip('/')}/{topic}"
+    headers: Dict[str, str] = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
     async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.post(url, content=message.encode("utf-8"))
+        response = await client.post(url, content=message.encode("utf-8"), headers=headers)
         return response.status_code >= 200 and response.status_code < 300
 
 
@@ -50,13 +53,16 @@ def build_digest_message(alerts: List[Dict[str, object]]) -> str:
     return "\n".join(lines)
 
 
-async def send_ntfy_digest(ntfy_url: str, topic: str, alerts: List[Dict[str, object]]) -> bool:
+async def send_ntfy_digest(ntfy_url: str, topic: str, alerts: List[Dict[str, object]], *, token: str = "") -> bool:
     if not ntfy_url or not topic:
         return False
 
     message = build_digest_message(alerts)
     url = f"{ntfy_url.rstrip('/')}/{topic}"
+    headers: Dict[str, str] = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
     async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.post(url, content=message.encode("utf-8"))
+        response = await client.post(url, content=message.encode("utf-8"), headers=headers)
         return response.status_code >= 200 and response.status_code < 300
