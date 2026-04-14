@@ -45,17 +45,19 @@ def load_tools() -> List[Dict[str, object]]:
     return tools
 
 
-def add_custom_tool(name: str, keywords: List[str], version: str | None, cpe: str | None) -> Dict[str, object]:
+def add_custom_tool(name: str, keywords: List[str], version: str | None, cpe: str | None, source: str | None = "custom") -> Dict[str, object]:
     cleaned = [kw.lower() for kw in keywords]
     if name.lower() not in cleaned:
         cleaned.append(name.lower())
 
+    resolved_source = source or "custom"
     tool = {
         "id": f"custom-{uuid.uuid4().hex}",
         "name": name,
         "keywords": cleaned,
         "version": version,
         "cpe": cpe,
+        "source": resolved_source,
     }
 
     tools = []

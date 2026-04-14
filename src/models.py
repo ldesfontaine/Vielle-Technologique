@@ -111,7 +111,7 @@ def insert_alert(db_path: str, alert: Dict[str, Any]) -> int:
 
 def list_alerts(
     db_path: str,
-    severity: Optional[str] = None,
+    severity: Optional[List[str]] = None,
     tool: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 50,
@@ -122,8 +122,9 @@ def list_alerts(
     params: List[Any] = []
 
     if severity:
-        clauses.append("severity = ?")
-        params.append(severity)
+        placeholders = ",".join("?" for _ in severity)
+        clauses.append(f"severity IN ({placeholders})")
+        params.extend(severity)
     if status:
         clauses.append("status = ?")
         params.append(status)

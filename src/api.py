@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -27,6 +27,7 @@ class ToolCreate(BaseModel):
     keywords: List[str]
     version: Optional[str] = None
     cpe: Optional[str] = None
+    source: Optional[str] = "custom"
 
 
 class AlertUpdate(BaseModel):
@@ -61,7 +62,7 @@ def create_app(
 
     @app.get("/api/alerts")
     def api_list_alerts(
-        severity: Optional[str] = None,
+        severity: Optional[List[str]] = Query(None),
         tool: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 50,
@@ -100,7 +101,7 @@ def create_app(
 
     @app.post("/api/tools", dependencies=[Depends(_require_token)])
     def api_add_tool(payload: ToolCreate):
-        tool = add_custom_tool(payload.name, payload.keywords, payload.version, payload.cpe)
+        tool = add_custom_tool(payload.name, payload.keywords, payload.version, payload.cpe, payload.source)
         return tool
 
     @app.delete("/api/tools/{tool_id}", dependencies=[Depends(_require_token)])
