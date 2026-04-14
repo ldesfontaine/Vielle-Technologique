@@ -141,6 +141,10 @@
           <button id="load-stats" style="margin-left: 8px;">Stats</button>
           <button id="load-tools" style="margin-left: 8px;">Tools</button>
           <button id="collect-now" style="margin-left: 8px;">Collect now (crawl)</button>
+          <div style="margin-top: 8px;">
+            <label for="api-token">Token</label>
+            <input id="api-token" type="password" placeholder="VEILLE_TOKEN" style="width: 220px;" />
+          </div>
           <p class="note">Le collecteur tourne deja en auto. Ce bouton force une collecte avec cooldown.</p>
         </div>
         <div class="card">
@@ -255,7 +259,10 @@
       });
 
       document.getElementById("collect-now").addEventListener("click", async () => {
-        const response = await fetch("/api/collect", { method: "POST" });
+        const token = document.getElementById("api-token").value.trim();
+        const headers = {};
+        if (token) headers["Authorization"] = "Bearer " + token;
+        const response = await fetch("/api/collect", { method: "POST", headers });
         const data = await response.json();
         setOutput(data);
         renderCollect(data.new_alerts || [], data.inserted || 0);

@@ -1,11 +1,25 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from typing import Awaitable, Callable, Dict, List, Optional
 import os
 
 from .matcher import add_custom_tool, delete_custom_tool, load_tools
 from .models import get_alert, get_stats, list_alerts, update_alert_status
+
+_bearer_scheme = HTTPBearer()
+
+
+def _require_token(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+) -> None:
+    """Verify Bearer token matches VEILLE_TOKEN env var."""
+    expected = os.environ.get("VEILLE_TOKEN", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail="VEILLE_TOKEN not configured")
+    if credentials.credentials != expected:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 class ToolCreate(BaseModel):
@@ -71,7 +85,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="Alert not found")
         return alert
 
-    @app.patch("/api/alerts/{alert_id}")
+    @app.patch("/api/alerts/{alert_id}", dependencies=[Depends(_require_token)])
     def api_update_alert(alert_id: int, payload: AlertUpdate):
         if payload.status not in {"new", "read", "dismissed"}:
             raise HTTPException(status_code=400, detail="Invalid status")
@@ -84,12 +98,12 @@ def create_app(
     def api_list_tools():
         return {"tools": load_tools()}
 
-    @app.post("/api/tools")
+    @app.post("/api/tools", dependencies=[Depends(_require_token)])
     def api_add_tool(payload: ToolCreate):
         tool = add_custom_tool(payload.name, payload.keywords, payload.version, payload.cpe)
         return tool
 
-    @app.delete("/api/tools/{tool_id}")
+    @app.delete("/api/tools/{tool_id}", dependencies=[Depends(_require_token)])
     def api_delete_tool(tool_id: str):
         deleted = delete_custom_tool(tool_id)
         if not deleted:
@@ -101,7 +115,7 @@ def create_app(
         return get_stats(db_path)
 
     if collect_handler:
-        @app.post("/api/collect")
+        @app.post("/api/collect", dependencies=[Depends(_require_token)])
         async def api_collect_now():
             return await collect_handler()
 
