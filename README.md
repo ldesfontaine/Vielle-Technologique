@@ -1,17 +1,19 @@
-# veille-secu
+# veille-securite
 
-Moteur de veille cybersecurite minimaliste. Collecte, filtre et notifie les CVEs et advisories pertinents pour un stack technique declare.
+Moteur de veille en cybersécurité qui collecte, normalise et filtre les
+vulnérabilités et avis de sécurité pertinents pour un ensemble de technologies
+déclaré.
 
-## Fonctionnalites
+## Fonctionnalités
 
-- 5 sources fiables : NVD, CERT-FR, GitHub Advisories, CISA KEV, Exploit-DB
-- Filtrage par stack via WATCH_STACK
-- Stockage SQLite
-- Notifications Ntfy pour les alertes critiques
-- API HTTP simple (FastAPI)
-- Dashboard optionnel pour tester les requetes
+- collecte depuis NVD, CERT-FR, GitHub Advisories, CISA KEV et Exploit-DB ;
+- filtrage selon les technologies suivies dans `WATCH_STACK` ;
+- stockage local dans SQLite ;
+- notifications Ntfy pour les alertes critiques ;
+- API HTTP avec FastAPI ;
+- tableau de bord optionnel pour consulter et tester les résultats.
 
-## Demarrage rapide
+## Démarrage rapide
 
 ```bash
 cp .env.example .env
@@ -21,7 +23,7 @@ pip install -r requirements.txt
 python -m src.main
 ```
 
-Ou via Docker :
+Avec Docker :
 
 ```bash
 docker compose up --build
@@ -29,33 +31,30 @@ docker compose up --build
 
 ## API
 
-- GET /api/alerts?severity=&tool=&status=&limit=&offset=
-- GET /api/alerts/:id
-- PATCH /api/alerts/:id
-- GET /api/tools
-- POST /api/tools
-- DELETE /api/tools/:id
-- GET /api/stats
-- GET /health
-- POST /api/collect (declenche une collecte manuelle, avec cooldown)
+- `GET /api/alerts?severity=&tool=&status=&limit=&offset=`
+- `GET /api/alerts/:id`
+- `PATCH /api/alerts/:id`
+- `GET /api/tools`
+- `POST /api/tools`
+- `DELETE /api/tools/:id`
+- `GET /api/stats`
+- `GET /health`
+- `POST /api/collect`
 
-## Dashboard (optionnel)
+La collecte manuelle possède un délai de protection afin d'éviter les
+déclenchements répétés.
 
-Activer via `DASHBOARD_ENABLED=true`, puis ouvrir `/dashboard`.
+## Vérifier la collecte
 
-## Verifier que la veille tourne
+- `GET /api/stats` permet de vérifier que le nombre d'alertes évolue ;
+- `GET /api/alerts?limit=5` affiche les dernières alertes stockées ;
+- `GET /api/tools` expose les technologies actuellement suivies ;
+- `POST /api/collect` force une collecte manuelle.
 
-- GET /api/stats pour voir `total` augmenter
-- GET /api/alerts?limit=5 pour voir les alertes stockees
-- GET /api/tools pour verifier le matching avec WATCH_STACK
-- POST /api/collect si tu veux forcer une collecte
+## Configuration
 
-## Variables d'environnement
+Les variables disponibles sont documentées dans `.env.example`.
 
-Voir .env.example pour la liste complete des variables.
-
-## Notes
-
-- Les alertes sont dedupliquees par CVE ID ou lien.
-- Seules les alertes matchant WATCH_STACK sont conservees.
-- Les notifications Ntfy sont envoyees pour les alertes critical.
+Les alertes sont dédupliquées par identifiant CVE ou par lien. Seules celles
+qui correspondent à `WATCH_STACK` sont conservées. Les notifications Ntfy sont
+réservées aux alertes critiques.
